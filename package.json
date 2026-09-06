@@ -1,0 +1,45 @@
+{
+  "name": "astra-advisor",
+  "version": "0.1.0",
+  "description": "A Pi extension for Sol/Luna execution with Astra planning advice and bounded read-only review.",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AmbitiousRealism2025/astra-advisor.git"
+  },
+  "homepage": "https://github.com/AmbitiousRealism2025/astra-advisor#readme",
+  "bugs": {
+    "url": "https://github.com/AmbitiousRealism2025/astra-advisor/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": ["pi-package", "pi-extension", "code-review"],
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-ai": { "optional": true },
+    "@earendil-works/pi-coding-agent": { "optional": true },
+    "typebox": { "optional": true }
+  },
+  "files": [
+    "index.ts",
+    "contracts.ts",
+    "workspace.ts",
+    "reviewer.ts",
+    "test.mjs",
+    "tests/run.ts",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "docs/"
+  ]
+}
