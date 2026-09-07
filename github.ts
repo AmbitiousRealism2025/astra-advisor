@@ -125,12 +125,15 @@ export class GithubClient {
     state = { ...state, phase: "awaiting_review", requestId: request.id, requestAt: request.created_at, reason: "Codex review requested; wait for feedback before claiming completion.", feedback: [] }; save(state);
     return state;
   }
+  async matches(state: GithubState, pr: Static<typeof prSchema>): Promise<boolean> {
+    const localHead = await this.git(["rev-parse", "HEAD"]);
+    const localBranch = await this.git(["symbolic-ref", "--short", "HEAD"]);
+    return pr.state === "open" && pr.head.sha === state.head && pr.head.ref === state.branch && pr.head.repo.full_name.toLowerCase() === state.repository.toLowerCase() && pr.base.ref === state.baseBranch && pr.base.sha === state.baseSha && localHead === state.head && localBranch === state.branch && !await this.git(["status", "--porcelain=v1", "--untracked-files=all"]);
+  }
   async poll(state: GithubState): Promise<GithubState> {
     if (!state.pr || !state.requestId || !state.requestAt) throw new Error("No complete GitHub review request is recorded; retry publication to reconcile it.");
     const before = await this.api(`repos/${state.repository}/pulls/${state.pr}`, prSchema);
-    const localHead = await this.git(["rev-parse", "HEAD"]);
-    const localBranch = await this.git(["symbolic-ref", "--short", "HEAD"]);
-    if (before.state !== "open" || before.head.sha !== state.head || before.head.ref !== state.branch || before.head.repo.full_name.toLowerCase() !== state.repository.toLowerCase() || before.base.ref !== state.baseBranch || before.base.sha !== state.baseSha || localHead !== state.head || localBranch !== state.branch || await this.git(["status", "--porcelain=v1", "--untracked-files=all"])) return { ...state, phase: "paused", reason: "PR/local head, base, branch or worktree changed outside this review request. Do not reuse approval; inspect the mismatch.", feedback: state.feedback };
+    if (!await this.matches(state, before)) return { ...state, phase: "paused", reason: "PR/local head, base, branch or worktree changed outside this review request. Do not reuse approval; inspect the mismatch.", feedback: state.feedback };
     const reviews = await this.list(`repos/${state.repository}/pulls/${state.pr}/reviews`, reviewSchema);
     const comments = await this.list(`repos/${state.repository}/issues/${state.pr}/comments`, commentSchema);
     const request = comments.find(c => c.id === state.requestId);
@@ -138,7 +141,7 @@ export class GithubClient {
     const inline = await this.list(`repos/${state.repository}/pulls/${state.pr}/comments`, inlineSchema);
     const reactions = await this.list(`repos/${state.repository}/issues/comments/${state.requestId}/reactions`, reactionSchema);
     const afterPr = await this.api(`repos/${state.repository}/pulls/${state.pr}`, prSchema);
-    if (afterPr.head.sha !== before.head.sha || afterPr.base.sha !== before.base.sha || afterPr.state !== "open") return { ...state, phase: "paused", reason: "PR changed while collecting review evidence.", feedback: [] };
+    if (!await this.matches(state, afterPr)) return { ...state, phase: "paused", reason: "PR or local target changed while collecting review evidence.", feedback: [] };
     return { ...state, ...classifyGithub(state, reviews, comments, inline, reactions) };
   }
 }

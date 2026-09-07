@@ -225,6 +225,31 @@ export async function runTests() {
     await chmod(join(root,'run.sh'),0o644);git('add','run.sh');git('commit','-qm','unreviewed mode change');assert.equal(await w.unchanged(),false);
     await assert.rejects(s.call('advisor_publish',{repository:'owner/repo',baseBranch:'main',title:'Fix',body:'Test'}),/fresh clean/);assert.equal(s.review().status,'incomplete');
   });
+  await test('poll rechecks full remote and local identity after feedback, including same-SHA retargeting', async root => {
+    for(const change of ['base-ref','head-ref','head-repo','local-head','local-branch','worktree']) {
+      const state=remoteState();let collected=false;
+      const pr={number:3,state:'open',head:{sha:A,ref:'feature',repo:{full_name:'owner/repo'}},base:{sha:BASE,ref:'main'}};
+      const request={id:7,user,created_at:at,body:`@codex review\n\nPlease review commit \`${A}\`.\n\n<!-- astra-advisor-review:${state.reviewId}:${A} -->`};
+      const run=async(binary,args)=>{
+        if(binary==='git') {
+          if(args[0]==='status')return collected&&change==='worktree'?' M src/main.ts':'';
+          if(args[0]==='symbolic-ref')return collected&&change==='local-branch'?'renamed':'feature';
+          return collected&&change==='local-head'?B:A;
+        }
+        const endpoint=args[3];
+        if(endpoint.includes('/reactions')){collected=true;return JSON.stringify([{user:bot,content:'+1',created_at:later}]);}
+        if(endpoint.includes('/issues/3/comments'))return JSON.stringify([request]);
+        if(endpoint.includes('/reviews?')||endpoint.includes('/pulls/3/comments'))return '[]';
+        const current=structuredClone(pr);
+        if(collected&&change==='base-ref')current.base.ref='retargeted';
+        if(collected&&change==='head-ref')current.head.ref='renamed';
+        if(collected&&change==='head-repo')current.head.repo.full_name='other/repo';
+        return JSON.stringify(current);
+      };
+      const result=await new GithubClient(root,new AbortController().signal,run).poll(state);
+      assert.equal(result.phase,'paused',change);assert.match(result.reason,/while collecting/);
+    }
+  });
   await test('all pipeline operations require isolated tool batches', async root => {
     const s=setup(root);s.branch.push({type:'message',message:{role:'assistant',content:[{type:'toolCall'},{type:'toolCall'}]}});
     for(const toolName of ['advisor_route','astra_verify','astra_review_wait','advisor_publish','advisor_github_wait'])assert.equal(s.hooks.tool_call({toolName},s.ctx).block,true);

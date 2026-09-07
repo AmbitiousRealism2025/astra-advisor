@@ -64,7 +64,7 @@ After GitHub findings, Sol fixes/tests/commits, then republishes with the same t
 
 `seconds` is 0–300. The tool polls at intervals of up to 30 seconds. Individual commands have their own timeout, so a polling window is not a strict whole-operation deadline. An ordinary wait timeout stays pending. Cancellation/API errors pause; waiting can be retried after resolving the problem.
 
-The tool checks PR identity, open state, head, base, local branch/head and a clean worktree, then collects paginated reviews, issue comments, inline comments and reactions on the recorded request. The request ID, author, exact body and creation time must still match the saved request.
+The tool checks PR identity, open state, head, base, local branch/head and a clean worktree, then collects paginated reviews, issue comments, inline comments and reactions on the recorded request. The request ID, author, exact body and creation time must still match the saved request. Full remote and local identity checks run again after collection, including branch names and worktree state—not only commit hashes.
 
 Only `chatgpt-codex-connector[bot]` with GitHub type `Bot` counts. Feedback must be at or after the recorded request time. Findings must belong to a review of the requested full commit and its original inline-comment commit. Findings take precedence over clean signals.
 

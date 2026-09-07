@@ -51,14 +51,16 @@ Also check local-path installation/removal with an isolated `PI_CODING_AGENT_DIR
 
 The original in-process release was tested with Pi 0.85.1 on Linux, including 20 regression cases, package discovery/install/remove, a local ad hoc strict typecheck and no-inference activation. Those checks do not validate the replacement transport.
 
-The replacement passed 18 local regression cases, including four tmux rounds with a simulated child. Package loading and an ad hoc strict typecheck against Pi 0.85.1 declarations also passed. These are local checks, not repository CI. A live Astra Medium worker started, inspected the repository, and resumed the same Pi session after its first attempt hit a context limit. It then submitted findings; those findings prompted executable-mode freshness coverage and a live GitHub reaction-contract check. Final review clearance is separate from this transport evidence.
+The replacement passed 19 local regression cases, including four tmux rounds with a simulated child. Package loading and an ad hoc strict typecheck against Pi 0.85.1 declarations also passed. These are local checks, not repository CI. A live Astra Medium worker started, inspected the repository, and resumed the same Pi session after its first attempt hit a context limit. It then submitted findings; those findings prompted executable-mode freshness coverage and a live GitHub reaction-contract check. Final review clearance is separate from this transport evidence.
 
 Still requires separate validation:
 
-- Real GitHub request/poll/fix/clean behavior in this repository
+- Broader GitHub failure/retry conditions beyond the fixtures and recorded PR evidence
 - Provider effort selection and main-session handoffs in the intended PiBB host
 - GUI custom-message rendering and interruption controls
 - macOS, other Pi versions, and portability beyond Unix; Windows is unsupported
+
+[PR #1](https://github.com/AmbitiousRealism2025/astra-advisor/pull/1) records live publication and Codex review evidence. The publication tool created the PR and exact-head request; the poller received a Codex finding about target changes during polling. The added six-variant regression failed on the reviewed commit and passed after full remote/local identity checks were repeated at collection end. Current clearance is reported on the PR, not inferred from these fixtures.
 
 Record live results separately from fixtures. Do not launch paid inference merely to check extension loading. Repository tests are not a security audit or proof of review quality.
 

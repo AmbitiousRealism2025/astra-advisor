@@ -14,11 +14,12 @@ Repository: [AmbitiousRealism2025/astra-advisor](https://github.com/AmbitiousRea
 
 ## Behavior
 
-- [x] Replacement regression suite passed 18 cases with real owned tmux transport and simulated inference/GitHub responses.
+- [x] Replacement regression suite passed 19 cases with real owned tmux transport and simulated inference/GitHub responses.
 - [x] Replacement source passed an ad hoc strict typecheck against Pi 0.85.1 declarations; this is not repository CI.
 - [x] Package-loading smoke check returned inactive/no review without inference.
 - [x] Record live Astra startup, inspection, same-session resumption and structured findings. Final clearance is a separate result.
-- [ ] Record real GitHub request, findings/corrections and explicit latest-head clearance.
+- [x] Record real GitHub publication, request, findings and corrections in [PR #1](https://github.com/AmbitiousRealism2025/astra-advisor/pull/1).
+- [ ] Require explicit latest-head Codex clearance before completing publication; consult the PR for the current result.
 - [ ] Validate actual main-session provider handoffs and GUI rendering/interruption behavior in each supported host.
 - [ ] Validate macOS/other Pi versions before extending the Linux/Pi 0.85.1 support claim. Windows remains unsupported.
 
@@ -31,7 +32,7 @@ Missing or ambiguous review feedback is pending. Cancellation, errors, disagreem
 - [x] Synchronize the requested external Markdown/HTML/PDF copies.
 - [x] Apply available Unslop core/Crisp Human rules manually; scanner scripts were unavailable.
 - [x] Check relative links and package contents.
-- [ ] Recheck the final staged files.
+- [x] Inspect staged files and whitespace before committing; repeat for corrective commits.
 - [x] Gitleaks found no leaks in source/docs; repeat the scan on the final candidate and extracted PDF text. Scanner success is not proof that all sensitive content is absent.
 - [x] Synchronize the installed extension with a backup outside auto-discovery directories; reload is required.
 
