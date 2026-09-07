@@ -1,46 +1,22 @@
 # Tool and state reference
 
-This document describes the current implementation. See the [README](../README.md) for installation and everyday use.
+See the [README](../README.md) for installation and everyday use. All primary tools require activation. A busy guard rejects overlapping operations; routing, local review, wait and publication tools must be called alone in their tool batch.
 
-## Primary-agent tools
+## Primary tools
 
-All three tools reject calls while Astra Advisor is disabled. Planning and review share a busy guard: only one Astra request runs at a time.
+### `consult_astra({ question, context })`
 
-### `consult_astra`
+One tool-free Astra High planning request. It receives the explicit brief, not the parent history. `question` is 1–12,000 characters; `context` is 1–60,000. Include essential restrictions, never secrets. It does not change the main model. Cancellation reaches the provider; empty/error responses fail and truncated responses are labeled. Completed advice includes usage.
 
-```json
-{
-  "question": "Which failure paths need attention?",
-  "context": "Relevant evidence and essential user/project restrictions. No secrets."
-}
-```
+### `advisor_route({ role, reason })`
 
-A single, tool-free Astra High planning request with a fresh request/session identity. It receives only the explicit brief, not the parent conversation. The main session's selected model does not change.
+`luna` selects Luna High, `sol` selects Sol High, and `coordinator` selects Sol Medium for subsequent responses in the same session. The reason is 1–2,000 characters. Failed model/effort selection is an error. Routing is not approval.
 
-`question` must be nonempty and at most 12,000 characters; `context` must be nonempty and at most 60,000. Cancellation propagates to the provider. Empty advice and provider errors are surfaced, and incomplete/truncated responses are labeled. Successful responses include provider usage in the tool result.
+Coordinator routing rechecks a saved local pass before the GitHub stage. After GitHub clearance it polls again rather than presenting a cached clean result as current.
 
-### `advisor_route`
+### `astra_verify({ action, packet })`
 
-```json
-{
-  "role": "luna",
-  "reason": "The change is narrow and has a focused regression test."
-}
-```
-
-| Role | Next model and reasoning |
-| --- | --- |
-| `luna` | Luna High |
-| `sol` | Sol High |
-| `coordinator` | Sol Medium |
-
-The reason is required and bounded to 2,000 characters. A preflight hook requires this call to be the only tool call in its batch. Routing changes subsequent responses in the same session; it does not create a worker or grant permission.
-
-Coordinator routing checks the freshness of a saved pass and returns the current review state. If model selection or the requested reasoning level is unavailable, the tool reports an error rather than claiming the handoff succeeded.
-
-### `astra_verify`
-
-Call alone after implementation, tests and diff inspection. A cycle starts with `action: "start"`; a corrective review uses `"recheck"`.
+`start` launches an owned tmux Pi reviewer. `recheck` starts another turn in the same persisted Pi session after Sol’s fixes. It returns `reviewing`; collect the report with `astra_review_wait`.
 
 ```json
 {
@@ -51,86 +27,76 @@ Call alone after implementation, tests and diff inspection. A cycle starts with 
     "files": ["src/session.ts", "test/session.test.ts"],
     "base": "HEAD",
     "diffSummary": "Added failure recovery around session replacement",
-    "tests": [
-      {
-        "command": "the actual test command",
-        "result": "actual output and result, including failures or omissions"
-      }
-    ],
+    "tests": [{"command": "actual test command", "result": "actual result and omissions"}],
     "limitations": ["GUI behavior has not been checked"],
-    "restrictions": "Essential project/user instructions. No deployment approval. Do not access secrets.",
+    "restrictions": "Essential user/project restrictions. No deployment approval. Never access secrets.",
     "risk": ["lifecycle"],
-    "executor": "sol",
     "resolutions": []
   }
 }
 ```
 
-All fields are required; arrays can be empty where omission of items has meaning. The serialized packet is capped at 60,000 characters. See [contracts.ts](../contracts.ts) for field-level schema bounds.
+The packet is capped at 60,000 serialized characters. All fields are required. `files` contains 1–100 unique relative paths; it is scope metadata, not a read-access allowlist. `base` is `HEAD`, a full commit hash, or `none` only outside Git. The resolved commit is frozen. Risk values are protocol, persistence, authentication, packages, lifecycle, release, low_risk and other. See [contracts.ts](../contracts.ts) for exact bounds.
 
-- `files`: 1–100 unique workspace-relative paths. This list is not a read-access allowlist; the reviewer can inspect other permitted files within the workspace.
-- `base`: `HEAD`, a full 40- or 64-character commit hash, or `none` for a non-Git directory. Git baselines are resolved to a commit and frozen for the cycle. A Git workspace cannot deliberately select `none`.
-- `risk`: one or more of protocol, persistence, authentication, packages, lifecycle, release, low_risk, or other.
-- `executor`: `sol` or `luna`.
-- `resolutions`: empty initially; on recheck, objects with `id`, `action` and `detail`. Actions are fixed, evidence, disputed or defer.
+Rechecks retain goal, invariants, restrictions, risk, baseline input and original files. Correction files may be added. Responses use `resolutions: [{id, action, detail}]`, with action fixed, evidence, disputed or defer. IDs must be unique prior IDs, and every unresolved blocker needs a response. There is no `executor` field: all review fixes route to Sol High.
 
-Every unresolved blocker needs a response. Resolution IDs must uniquely reference prior findings. Rechecks must retain the goal, invariants, restrictions, risk categories, original baseline input and original files. Correction files may be added.
+Tests are executor-reported. Identical file/test evidence stops a recheck; it does not prove whether a changed test result is authentic or a correction is meaningful. Disputed findings and deferred blockers stop incomplete. The GitHub stage cannot be replaced by another local review without a user reset.
 
-Tests and restrictions come from the executor's packet, not an automatic dump of the parent's system prompt. The caller must include essential project/user restrictions. Astra cannot independently attest that reported tests ran.
+### `astra_review_wait({ seconds })`
 
-## Reviewer-only tools
+`seconds` is 0–300. Zero checks once; otherwise the tool polls the owned job about once a second until completion or the polling window ends. Pending remains pending and can be waited on again without starting another reviewer.
 
-The reviewer receives a fresh model context with two private tools. They are not registered as tools in the main session.
+On completion, code validates the job identity, report and evidence freshness. `needs_fixes` routes to Sol High; `passed` or `incomplete` routes to Sol Medium. Cancellation signals the worker. Missing/malformed artifacts and worker errors are incomplete, never clean.
 
-- **`review_inspect`:** numbered file reads, bounded listing, literal search, fixed Git diffs, changed/untracked names, and a recent commit summary.
-- **`review_submit`:** structured report submission, called alone after inspection.
+### `advisor_publish({ repository, baseBranch, title, body })`
 
-No Pi child session or extension discovery is started. The loop uses the current Pi model registry for authenticated Astra completions and executes only the private tool allowlist.
+Only use for a publication the user authorized. `repository` is an explicit `owner/repo` on github.com; both origin fetch and push URLs must match. The working directory must be the repository root, the worktree clean, and the current branch a feature branch—not main, master, the repository default or the selected base. The tool never stages or commits files.
 
-## Findings
+First publication requires a fresh clean local review whose frozen baseline equals the current remote base commit. Commit the intended changes with normal main-session tools first. Commit hooks or other changes that alter reviewed content invalidate that gate.
 
-A report contains `summary`, `findings` and `evidenceGaps`. Each finding includes:
+The tool records publication intent before remote writes, pushes the exact commit without force, creates or updates a matching PR, and posts `@codex review` with an exact-head marker. PR bodies include `> AGENT GENERATED`; the caller must follow the repository’s PR template. Title and body are required on every call and are applied to the PR.
 
-| Field | Values or meaning |
-| --- | --- |
-| `id` | Stable `A1`, `A2`, … identifier |
-| `severity` | `blocking` or `non_blocking` |
-| `disposition` | `fix_now` or `separate_task` |
-| `status` | `open`, `resolved`, `disputed`, or `deferred` |
-| `title` | Short description |
-| `evidence` | Supporting file/contract evidence or the positions in a dispute |
-| `resolution` | Required correction, check, or decision |
+A failed write may already have succeeded remotely. State remains `publishing`; retry the same operation/head to reconcile the matching PR and request marker rather than duplicating them. Do not change the commit while reconciliation is pending.
 
-Reports support up to 20 findings and 12 essential evidence gaps. Rechecks must carry every earlier finding ID, including resolved findings. The assessor rejects duplicate IDs, omitted prior findings and blocker downgrades. Resolution requires evidence; changing a blocker to a separate task does not clear it.
+After GitHub findings, Sol fixes/tests/commits, then republishes with the same target. A new commit must descend from the prior head; the known remote head/base must not have changed independently. No force-push or merge is available.
 
-Optional limitations belong in the summary. `evidenceGaps` is for missing evidence essential to judging correctness. Classification and whether the evidence supports a finding remain model judgments.
+### `advisor_github_wait({ seconds })`
 
-## State and transitions
+`seconds` is 0–300. The tool polls at intervals of up to 30 seconds. Individual commands have their own timeout, so a polling window is not a strict whole-operation deadline. An ordinary wait timeout stays pending. Cancellation/API errors pause; waiting can be retried after resolving the problem.
 
-Review state persists under `astra-advisor-review-v1`; enablement uses `astra-advisor-enabled`. The review stores the cycle ID, round, status/reason, root, frozen baseline, packet/resolutions, report, fingerprints and inspected-file hashes.
+The tool checks PR identity, open state, head, base, local branch/head and a clean worktree, then collects paginated reviews, issue comments, inline comments and reactions on the recorded request. The request ID, author, exact body and creation time must still match the saved request.
 
-| State | Next action |
-| --- | --- |
-| No review | `start` can begin a cycle. |
-| `reviewing` | Astra is inspecting; concurrent requests are rejected. |
-| `needs_fixes` | Executor works at High, then can call `recheck`. |
-| `passed` | Return to Sol Medium; no automatic extra review. |
-| `incomplete` | Return to Sol Medium with unresolved items; no automatic extra review. |
+Only `chatgpt-codex-connector[bot]` with GitHub type `Bot` counts. Feedback must be at or after the recorded request time. Findings must belong to a review of the requested full commit and its original inline-comment commit. Findings take precedence over clean signals.
 
-The extension attempts the appropriate model handoff after a completed tool result. Handoff failures are reported separately; they do not silently change the review outcome.
+Clean evidence is either:
 
-A cycle permits one initial review and two corrective re-reviews. Unchanged file fingerprints and reported test evidence stop a recheck without another model request. That comparison detects identical evidence, not whether a claimed correction is meaningful or whether a test actually ran.
+- The bot’s `Codex Review: Didn't find any major issues.` response with a matching `**Reviewed commit:**` SHA/prefix; or
+- The bot’s `+1` reaction on the exact recorded request comment.
 
-Disputes, necessary deferrals, essential gaps at the round limit, errors, cancellation and unstable evidence result in `incomplete`, not `passed`. An interrupted `reviewing` state restores as incomplete. Corrupt latest state disables activation until an explicit user reset; prior reports remain in history.
+Silence, eyes reactions, unrelated authors, stale commits and generic completed summaries remain pending. These recognized formats are deliberately narrow; a changed bot format may require parser updates, never a guessed pass. Findings route to Sol High; clean/pending/paused results return to Sol Medium. No merge occurs.
 
-The reset command is the only reset surface. There is no model-callable reset tool, and the policy prohibits agents from using other channels to bypass limits. This is not an authentication boundary against an agent that already has arbitrary shell/session-control access.
+## Reviewer process and private tools
 
-## Freshness and scope
+Each cycle owns `astra-advisor-<UUID>` in tmux. Jobs live under `<Pi agent dir>/astra-advisor/reviews/<UUID>/<job UUID>/`. `reviewer.jsonl` in the cycle directory is reused through `pi --session` across rounds. Dead panes remain visible; rechecks respawn only the owned idle pane.
 
-Before and after review, the extension fingerprints declared files plus changed/untracked files in the current workspace. It also checks files the reviewer read outside the declared list. A changed or unreadable snapshot cannot pass.
+The worker selects `openai-codex/gpt-6-astra` with Medium reasoning. It disables extension/skill/template/theme/context discovery and approval prompts, then explicitly loads only the internal reviewer extension. No built-in read/bash/edit tools are exposed. PATH and the Pi agent directory come from the parent; in-memory provider customization and env-only authentication are not forwarded.
 
-Saved passes are checked at coordinator routing, new user runs and the slash `status` command. These checks are not continuous monitoring or a transactional filesystem snapshot. In a plain-prompt GUI invocation, the displayed status acknowledgment is built before the pre-run freshness check; use the dispatched slash command when you need the refreshed status report without running the agent.
+Private tools are `review_inspect` (bounded read/list/search/diff/status/log) and `review_submit` (structured report, alone after inspection). The reviewer retains its own conversation, not the main conversation. Only the main session’s Sol makes fixes.
 
-All changed/untracked files are included in the Git snapshot, not only the files named by the executor. An unrelated changed binary, oversized or excluded file can therefore make review incomplete. Keep the workspace focused, inspect the reported limitation, and do not treat a narrowed review as verification of excluded changes.
+## Findings and persistence
 
-Root changes require a user decision. A new cycle after a finished, stale or incomplete review requires `/astra-advisor reset-review`.
+Reports contain `summary`, up to 20 `findings`, and up to 12 essential `evidenceGaps`. Findings have stable A1/A2 IDs, severity blocking/non_blocking, disposition fix_now/separate_task, status open/resolved/disputed/deferred, plus title/evidence/resolution. Every prior ID must remain, including resolved findings; duplicate IDs, dropped findings and blocker downgrades are rejected.
+
+Local states: reviewing → needs_fixes → recheck, or passed/incomplete. There is no fixed cycle round ceiling. Per-round resource bounds still apply. Necessary deferrals, disputes, unstable evidence and failures cannot pass.
+
+Persistence keys are `astra-advisor-enabled`, `astra-advisor-review-v2` and `astra-advisor-github-v1`. Legacy in-process review state cannot authorize publication; a user reset is required. State follows the active session branch. Interrupted jobs retain their descriptor for result/error collection; shutdown/navigation sends cancellation. Generation guards discard late results from a replaced session.
+
+`reset-review` closes only the owned tmux session and clears active pipeline state. Reports/artifacts and existing PRs remain. There is no model-callable reset tool; this policy is not an authentication boundary against an executor with shell/session-control access.
+
+## Freshness limits
+
+Snapshots cover declared and changed/untracked file contents and executable permissions, including bounded binary artifact hashes. Text inspection still rejects binary data. Files inspected outside the declared list are checked too. Unsupported, excluded or oversized snapshot evidence blocks review rather than silently disappearing.
+
+Local-pass freshness is checked before first publication and at coordinator/new-run/status boundaries before the GitHub stage. GitHub fixes intentionally supersede the original local snapshot and require fresh Codex review of each new head. Saved GitHub status is last observed; the wait tool checks live state.
+
+These checks are not continuous monitoring, a transactional filesystem snapshot, or a defense against every concurrent local mutation. New scope, roots or base commits require a user decision and a fresh cycle.

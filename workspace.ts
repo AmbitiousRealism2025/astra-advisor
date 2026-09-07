@@ -7,13 +7,22 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 const blocked = /^(?:\.git|\.pi|\.bb|\.pibb|\.ssh|\.aws|\.gnupg|node_modules|\.env(?:\..*)?|auth\.json|credentials(?:\..*)?|secrets?(?:\..*)?|id_rsa.*|id_ed25519.*)$/i;
 const sensitiveExtension = /\.(?:pem|key|p12|pfx|keystore)$/i;
 const maxFile = 1024 * 1024;
+type FileData = { bytes: Buffer; mode: number } | null;
+function fingerprint(file: FileData): string {
+  return digest(file === null ? "ABSENT" : JSON.stringify({ mode: file.mode & 0o111, content: digest(file.bytes) }));
+}
+function text(file: FileData): string {
+  if (file === null) return "[FILE ABSENT]";
+  if (file.bytes.includes(0)) throw new Error("Binary files cannot be inspected as text.");
+  return file.bytes.toString("utf8");
+}
 export function safeRelative(path: string): string {
   if (!path || path.length > 500 || isAbsolute(path) || path.includes("\\") || path.includes("\0")) throw new Error("Use a workspace-relative path.");
   const parts = path.split("/");
   if (parts.some(p => !p || p === "." || p === ".." || blocked.test(p) || sensitiveExtension.test(p))) throw new Error("Path is excluded from Astra review (secret, metadata, dependency, or traversal path).");
   return parts.join("/");
 }
-export function digest(value: string): string { return createHash("sha256").update(value).digest("hex"); }
+export function digest(value: string | Uint8Array): string { return createHash("sha256").update(value).digest("hex"); }
 export function bounded(text: string, maxBytes = 24000): string {
   const lines = text.split("\n");
   const prefix = lines.slice(0, 1500).join("\n");
@@ -56,14 +65,14 @@ export class ReviewWorkspace {
     return current;
   }
 
-  async contents(path: string): Promise<string> {
+  async file(path: string): Promise<FileData> {
     this.signal.throwIfAborted();
     const target = await this.path(path);
     let handle;
     try {
       handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ENOENT") return "[FILE ABSENT]";
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
       throw error;
     }
     try {
@@ -75,15 +84,21 @@ export class ReviewWorkspace {
       const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
       if (bytesRead > maxFile) throw new Error("File grew beyond the inspection limit.");
       const content = bytes.subarray(0, bytesRead);
-      if (content.includes(0)) throw new Error("Binary files cannot be inspected as text.");
       this.signal.throwIfAborted();
-      return content.toString("utf8");
+      return { bytes: content, mode: stat.mode };
     } finally { await handle.close(); }
   }
 
+  async contents(path: string): Promise<string> {
+    return text(await this.file(path));
+  }
+
+  async fingerprint(path: string): Promise<string> { return fingerprint(await this.file(path)); }
+
   async read(path: string, offset: number, limit: number): Promise<string> {
-    const content = await this.contents(path);
-    this.inspected.set(path, digest(content));
+    const file = await this.file(path);
+    const content = text(file);
+    this.inspected.set(path, fingerprint(file));
     return bounded(content.split("\n").slice(offset - 1, offset - 1 + limit).map((line, i) => `${offset + i}: ${line}`).join("\n"));
   }
 
@@ -118,9 +133,10 @@ export class ReviewWorkspace {
       if (bytes >= 8 * maxFile || this.inspected.size >= 1000) break;
       this.signal.throwIfAborted();
       try {
-        const content = await this.contents(path);
+        const file = await this.file(path);
+        const content = text(file);
         bytes += Buffer.byteLength(content);
-        this.inspected.set(path, digest(content));
+        this.inspected.set(path, fingerprint(file));
         content.split("\n").forEach((line, i) => { if (line.includes(query) && hits.length < 100) hits.push(`${path}:${i + 1}: ${line.slice(0, 1000)}`); });
       } catch { this.signal.throwIfAborted(); skipped++; }
     }
@@ -144,10 +160,10 @@ export class ReviewWorkspace {
     for (const path of [...new Set([...files, ...changed])].sort()) {
       try {
         if (total >= 8 * maxFile) throw new Error("Review snapshot exceeds 8MiB.");
-        const content = await this.contents(path);
-        total += Buffer.byteLength(content);
+        const file = await this.file(path);
+        total += file?.bytes.length ?? 0;
         if (total > 8 * maxFile) throw new Error("Review snapshot exceeds 8MiB.");
-        rows.push(`${path}:${digest(content)}`);
+        rows.push(`${path}:${fingerprint(file)}`);
       } catch (error) {
         this.signal.throwIfAborted();
         excluded.push(path);
@@ -164,7 +180,7 @@ export class ReviewWorkspace {
   }
 
   async unchanged(): Promise<boolean> {
-    for (const [path, hash] of this.inspected) if (digest(await this.contents(path)) !== hash) return false;
+    for (const [path, hash] of this.inspected) if (await this.fingerprint(path) !== hash) return false;
     return true;
   }
 }

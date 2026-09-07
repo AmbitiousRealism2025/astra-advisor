@@ -1,292 +1,134 @@
-# Build `/astra-advisor`: a portable brief for a Pi coding agent
+# Build `/astra-advisor`: portable brief for a Pi coding agent
 
-## Instructions to the receiving agent
+## Task and evidence
 
-Create and install a Pi extension named **astra-advisor** implementing this specification. This revision adds a read-only Astra reviewer and a bounded fix/recheck cycle.
+Create and install a Pi extension implementing the behavior below. This specification replaces the original in-process Astra High verification loop with a persistent Pi Astra Medium reviewer in tmux and a subsequent GitHub Codex review loop.
 
-Inspect the installed Pi version, extension documentation, model registry APIs and examples before coding. Use supported APIs for that version. Implement directly; do not launch a multi-agent workflow merely because this document describes orchestration.
+Inspect the installed Pi version, SDK, CLI flags, session format and extension examples first. Use supported APIs. Preserve unrelated files and sessions; do not launch a multi-agent workflow merely because this brief describes orchestration. Never claim installation, inference, GUI behavior or publication succeeded without checking it.
 
-This is a build specification, not an installed extension. Do not claim installation, activation, live inference, or GUI rendering succeeded without verifying it. Preserve existing files and unrelated customizations.
+## Models and responsibilities
 
-## Goal and roles
-
-Keep **Sol Medium** as the main coordinator, use **Astra High** for planning advice and independent evidence review, and execute with **Luna High** or **Sol High** according to task complexity.
-
-| Role | Preferred model ID | Reasoning |
+| Role | Provider/model | Reasoning |
 | --- | --- | --- |
-| Coordinator and final synthesis | `gpt-5.6-sol` | `medium` |
-| Planning advisor and post-implementation reviewer | `gpt-6-astra` | `high` |
-| Scoped executor | `gpt-5.6-luna` | `high` |
-| Complex executor | `gpt-5.6-sol` | `high` |
+| Main coordinator and reporting | openai-codex/gpt-5.6-sol | Medium |
+| Tool-free planning advisor | openai-codex/gpt-6-astra | High |
+| Narrow initial implementation | openai-codex/gpt-5.6-luna | High |
+| Complex implementation and all review fixes | openai-codex/gpt-5.6-sol | High |
+| Independent tmux reviewer | openai-codex/gpt-6-astra | Medium |
 
-The reference installation uses `openai-codex`. Check model availability and configured authentication. If the mapping is unavailable, report exactly what is missing and ask the user to choose a mapping. Never silently substitute models or invent IDs. Use Pi's authentication resolver; do not read credentials into the conversation or copy secrets into source/configuration.
+Main execution stays in the user’s existing Pi/PiBB session. Planning is one fresh, explicit-brief model request without tools. Post-implementation review runs in a separate owned tmux Pi session—not Codex CLI, not the old in-process reviewer, and not a fresh `--no-session` conversation each round.
 
-## Architecture
+Check model availability/authentication and exact effort. Never silently substitute models. Use Pi’s supported authentication; never read credentials into the conversation or copy secrets into source. A separate CLI worker may not share in-memory provider customization or env-only auth; surface that limitation.
 
-- Sol and Luna execute in the user's existing session. Model handoffs change subsequent responses without spawning another executor.
-- Planning advice is a single, fresh-context, tool-free Astra request.
-- Verification is a fresh, bounded Astra model/tool loop exposing only explicitly implemented read-only inspection and structured report submission.
-- Verification must not load the parent session's tools, project extensions, background services, or another agent's delegation instructions.
-- The primary executor keeps existing tools and approval hooks. Reviewer tools have their own restricted implementation, not automatically inherited parent tool hooks.
-- Astra cannot edit files, run tests, execute shell commands, delegate, create tasks, deploy, or approve actions.
-- Sol/Luna fixes confirmed problems and runs checks requested by Astra.
-- Calls are synchronous and cancellable. Do not imply Sol remains concurrently responsive while awaiting Astra.
-- Do not change global default models or unrelated sessions.
+## User interaction
 
-## Invocation and acknowledgment
-
-### CLI/TUI
+Support these invocations:
 
 ```text
 /astra-advisor
 /astra-advisor Investigate and fix the failing tests.
-```
-
-Bare invocation activates immediately; `on` is an optional compatible alias. Command-plus-task activates, acknowledges, and submits the task exactly once using Pi's supported user-message API. Do not recursively redispatch the command.
-
-### GUI/plain prompt
-
-```text
 Use /astra-advisor to investigate and fix the failing tests.
-```
-
-Recognize this explicit marker, or a leading `/astra-advisor` passed as ordinary text, before the first model request. It must start the prompt after whitespace, be case-insensitive, and have a token boundary after the command name. Preserve task text and attached images. Ordinary mentions, leading quoted/fenced examples, and `/astra-advisor-other` must not activate it.
-
-### Controls
-
-```text
 /astra-advisor status
 /astra-advisor off
 /astra-advisor reset-review
 ```
 
-- `status`: report enablement and the current review outcome without activating. Check freshness before reporting a saved pass.
-- `off`: cancel any pending Astra request and disable policy/tools. Leave the current model selected; explain that behavior.
-- `reset-review`: explicit user authorization for a fresh cycle, such as a new task or retry after an incomplete review. Keep prior reports in history. Do not claim a pass or automatically activate a disabled extension.
-- Reserved controls must not become forwarded task text or accidental activation when passed through the supported plain-prompt path.
-- Do not expose an agent-callable reset tool. Instruct agents not to use commands or other channels to bypass review limits.
+Bare/on activation emits “Astra Advisor active” with the correct roles. Command-plus-task forwards the task exactly once. The plain-prompt marker must lead the prompt after whitespace, be case-insensitive, have a token boundary and preserve the original task/attachments. Ordinary mentions, quoted/fenced examples and `/astra-advisor-other` must not activate it.
 
-After activation, emit a visible custom message equivalent to:
+Use visible Pi custom messages, not only notifications. A GUI must render those messages. Explain that a fallback pre-agent prompt is not the same as an immediately dispatched command.
 
-> Astra Advisor active — Sol Medium coordinates, Astra High advises and reviews with read-only tools, Luna High handles scoped fixes, and Sol High handles complex fixes.
+Status must distinguish saved state from fresh GitHub evidence. Off cancels pending work and disables tools/policy without resetting the model or undoing completed remote writes. Reset is explicit user authorization for a new cycle: close only the owned tmux session, clear active pipeline state, and retain old history/artifacts/PRs. Never expose a model-callable reset or use other channels to evade unresolved findings.
 
-Use `display: true` and a TUI status indicator where supported. Do not rely only on terminal notifications. GUI hosts must render Pi custom messages to display acknowledgments. Emit visible review-start and review-outcome messages too.
+Start disabled in new sessions. Persist validated state on the active Pi session branch. Restore on load/navigation; reject corrupt or incompatible approvals. Each new user run starts on Sol Medium while enabled, but do not reset the model between every tool response. Preserve existing system instructions and approval hooks.
 
-## Session persistence
+## Required sequence
 
-Start disabled in new sessions. Persist enablement and structured review state on the active branch using namespaced custom entries. Re-enabling does not reset a review cycle.
+1. Sol gathers evidence and can consult tool-free Astra High for substantive planning.
+2. Sol/Luna High implements in the current session, runs checks and inspects the diff.
+3. Sol sends an explicit packet to tmux Astra Medium.
+4. Astra inspects read-only and reports structured findings. Sol High validates and fixes confirmed blockers, tests, and sends a recheck to the same reviewer conversation.
+5. Repeat after meaningful progress until Astra has no blockers or essential gaps. There is no fixed three-round ceiling.
+6. With user authorization to publish this task, Sol commits only the intended changes on a feature branch. Verify reviewed evidence is unchanged before pushing.
+7. Push without force, create/update the PR, and post `@codex review` for the exact head.
+8. Wait for GitHub. Codex findings return to Sol High for fixes, tests, a new commit, push and a fresh request. Continue until trusted Codex feedback explicitly clears the latest commit.
+9. Report the PR, reviewed head and limitations. Never merge automatically.
 
-Restore on session load/reload and tree navigation; never take state from abandoned branches. A review interrupted while `reviewing` restores as `incomplete`, retaining the consumed round. Validate persisted data; corrupted state must not become a pass or silently erase limits.
+Missing/delayed feedback, an eyes reaction, a generic completed summary, stale reviews and timeouts are pending—not approval. Stop for user input on disagreement, no progress, necessary scope expansion, missing essential evidence, cancellation or operational failure. Never publish or claim clean because retries stopped. Optional independent work can be proposed separately only when safely deferrable; a large necessary fix remains blocking.
 
-When enabled, start each new user run as Sol Medium and append policy/current review state to the existing system prompt. Never discard existing restrictions or reset the model before every individual response, which would undo handoffs.
+Review is required by policy for protocol/contracts, persistence, authentication, packages, lifecycle and release changes. A user can decline review; report it as skipped, never passed. Policy cannot force an agent with other tools to use the pipeline.
 
-Cancel pending work on session shutdown or replacement. Use a generation/session guard so old async completions cannot publish state or switch models in a new session.
+## Primary tools
 
-## Review-and-fix cycle
+- `consult_astra({question, context})`: one tool-free Astra High call; 12,000/60,000 character field caps; explicit restrictions and evidence only; no parent history. Forward cancellation and available usage; label truncation/errors.
+- `advisor_route({role, reason})`: same-session next-response handoff; luna/sol High, coordinator Sol Medium. Require isolated tool batches and actual selection success. Routing is not approval.
+- `astra_verify({action, packet})`: start/recheck the owned tmux review; return reviewing rather than inventing a result.
+- `astra_review_wait({seconds})`: 0–300 second polling window; pending can be waited on again without restarting the reviewer. Findings → Sol High, passed/incomplete → Sol Medium.
+- `advisor_publish({repository, baseBranch, title, body})`: explicit github.com target, fresh local gate for first publication, retry-safe exact-head push/PR/request. Never stage, commit, force-push or merge. Apply supplied PR metadata and repository template, including an agent-generated disclosure.
+- `advisor_github_wait({seconds})`: 0–300 second window with approximately 30-second polling intervals. Validate current head/base/identity, collect all bounded pages, classify trusted feedback and route accordingly.
 
-```text
-Sol Medium gathers evidence
-    -> Astra High planning advice (when useful)
-    -> Sol/Luna High implementation, tests, and diff inspection
-    -> Astra High read-only review
-         -> no blockers or essential gaps: Sol Medium reports
-         -> fixes/evidence needed: executor works, then Astra rechecks
-         -> incomplete/escalation: Sol Medium reports or asks the user
-```
+All tools reject disabled/concurrent operations. All state-changing/handoff/wait calls must be alone in their tool batch. Clear busy state on every exit. Cancellation/navigation must not let late completions write state or change models in a replacement session.
 
-The main agent follows instructions and tool results to perform fixes and request rechecks. Extension code must enforce state transitions, review limits and next-model selection. Do not create autonomous background fixes.
-
-### When review is required
-
-Require it by policy for changes involving:
-
-- Protocols and shared contracts
-- Persistence, migrations and data integrity
-- Authentication, permissions or secrets
-- Package installation, updates and dependency resolution
-- Reload/session/process lifecycle and host targeting
-- Releases and deployment behavior
-
-Allow optional review for routine low-risk work. A user can decline review; the final report must say it was not run. Do not claim the extension can reliably classify risk or force a model to call a tool solely through prompting.
-
-### Limits and exit conditions
-
-Allow **one initial review plus two corrective re-reviews**, not an unbounded approval loop.
-
-- With no unresolved blockers or essential evidence gaps, return to Sol Medium promptly.
-- With blockers or essential missing evidence and rounds remaining, route automatically to the selected executor at High.
-- Stop without another model call if file fingerprints and reported test evidence are unchanged since the last review. This detects identical evidence, not whether a revision is semantically meaningful.
-- Escalate disagreements and necessary fixes deferred beyond scope; preserve both positions.
-- At the round limit, or on cancellation, malformed output, provider failure, unstable evidence, or inspection limits, return to Sol Medium with `incomplete`.
-- Never convert exhausted limits, deferral, or missing evidence into a pass.
-- Permit coordinator handoff even when problems remain. Returning control and passing verification are separate outcomes.
-- A fresh cycle requires the user's explicit reset command. Do not erase limits on the next prompt or on reactivation.
-
-### Fix now versus separate task
-
-Astra recommends a disposition with evidence and rationale:
-
-- **Fix now:** necessary for this change to meet requirements safely, including introduced correctness, security, integrity or contract problems.
-- **Separate task:** an independent pre-existing issue or optional improvement that can safely be deferred.
-- A large necessary fix is still blocking. If it exceeds authorized scope, ask the user rather than silently expanding scope or calling it non-blocking.
-
-The executor checks findings against the repository, fixes confirmed problems and reruns affected checks. It records rejected/disputed findings with reasons. Separate tasks remain proposals; do not file or start them without user authorization.
-
-## Tools exposed to the primary agent
-
-### `consult_astra({ question, context })`
-
-Tool-free planning advice only. Require nonempty strings, with limits of 12,000 and 60,000 characters respectively. Include evidence and essential restrictions, never secrets. No inherited conversation.
-
-Resolve Astra through Pi's authenticated model registry, request high reasoning, use a fresh request/session identity, and forward cancellation. Advice should cover approach, risks, missing evidence and suggested execution tier. Astra must not claim file inspection or execution.
-
-Allow only one Astra consultation/review at a time. Always clear busy state. Surface errors/empty advice and label truncated or incomplete responses. Include available nested usage in tool accounting. Cap parent-facing output at 2,000 lines/50KB.
-
-### `advisor_route({ role, reason })`
-
-Roles: `luna` = Luna High, `sol` = Sol High, `coordinator` = Sol Medium. Require a nonempty bounded reason, check actual model/effort selection success, and report review state with the handoff. Check freshness before reporting a prior pass.
-
-Reject calls while disabled or another Astra request is active. Require routing to be alone in its tool batch using a preflight/tool-call hook. Do not imply a coordinator handoff clears unresolved findings.
-
-### `astra_verify({ action, packet })`
-
-`action` is `start` or `recheck`. Require it to be alone in its tool batch, after implementation, tests and diff inspection. Reject disabled/concurrent calls and invalid state transitions.
-
-Require an explicit packet, no nullable/default-hiding fields:
+### Review packet
 
 ```json
 {
-  "goal": "Handle failed session reload without losing the active session",
-  "invariants": ["A rejected reload leaves the existing session available"],
+  "goal": "Preserve the active session if reload fails",
+  "invariants": ["A rejected reload preserves the active session"],
   "files": ["src/session.ts", "test/session.test.ts"],
   "base": "HEAD",
-  "diffSummary": "Added failure recovery around session replacement",
-  "tests": [{ "command": "the actual check command", "result": "actual output/result, including failures or omissions" }],
-  "limitations": ["GUI behavior has not been checked"],
-  "restrictions": "Essential project/user instructions. No deployment approval. Do not access secrets.",
+  "diffSummary": "Added failure recovery",
+  "tests": [{"command": "actual command", "result": "actual output and omissions"}],
+  "limitations": ["GUI behavior not checked"],
+  "restrictions": "Essential project/user restrictions. Never access secrets.",
   "risk": ["lifecycle"],
-  "executor": "sol",
   "resolutions": []
 }
 ```
 
-Packet limit: 60,000 characters, with bounded fields and arrays. `risk` values: protocol, persistence, authentication, packages, lifecycle, release, low_risk, other. `executor`: sol or luna.
+All fields are required; cap the packet at 60,000 serialized characters and bound every field/array. Files are 1–100 unique relative paths. Risk values: protocol, persistence, authentication, packages, lifecycle, release, low_risk, other. There is no executor selector for fixes: use Sol High.
 
-`base` is HEAD, a full Git commit hash, or `none` only for a non-Git directory. Resolve/freeze the commit for the cycle. Rechecks retain the goal, invariants, restrictions, risk categories, baseline and original file list; corrective files may be added.
+Freeze HEAD/full hash to a commit. `none` is allowed only outside Git. Rechecks retain goal, invariants, restrictions, risk, baseline input and original files; correction files may be added. Resolutions use prior unique IDs and fixed/evidence/disputed/defer actions with detail; every blocker needs a response. Tests remain executor-reported, not independently run by Astra.
 
-Rechecks include `resolutions: [{ id, action, detail }]`, using fixed, evidence, disputed or defer. IDs must uniquely reference previous findings; every unresolved blocker requires a response. Preserve requested checks and actual results rather than relying on the executor's summary alone.
+## Persistent tmux reviewer
 
-## Read-only tools available to Astra
+Use a unique owned session per cycle and a stable Pi `--session` file. Each round has a unique job ID and separate artifacts. Validate all descriptors and reports. Do not reuse/overwrite an unrelated existing tmux session. Respawn only the owned idle pane and keep dead panes available for inspection.
 
-Create a private `review_inspect` tool with a validated operation enum:
+Run Pi with Astra Medium, disable ordinary extension/skill/template/theme/context discovery, and explicitly load only the private reviewer extension. Expose only `review_inspect` and `review_submit`; never expose built-in bash, edits, tests, delegation, network tools or publication. The reviewer retains its own prior conversation, not the main conversation.
 
-- `read`: numbered file ranges
-- `list`: bounded file discovery
-- `search`: literal text search, not arbitrary regex execution
-- `diff`: fixed Git diff against the frozen baseline for a validated relative file
-- `status`: changed/untracked file names in the current workspace
-- `log`: a bounded recent Git commit summary
+Use private directories/artifacts outside the checkout. Bound captured output and command duration. Cancel the worker’s child process group and record a failed/cancelled exit; a missing report or mismatched job identity cannot pass. Keep prior session context across corrective rounds, but allow a safe pause if context/resource limits prevent further review.
 
-Expose no raw commands, Git arguments, shell, edits, tests, network tools or delegation.
+### Read-only inspection
 
-Use canonical workspace-relative paths, reject traversal and symlinks, accept only bounded regular text files, and deny common secret/metadata paths. The reference implementation excludes `.git`, `.pi`, `.bb`, `.pibb`, `.ssh`, `.aws`, `.gnupg`, `node_modules`, `.env*`, common credential filenames, and private-key file extensions.
+Implement bounded numbered reads, listing, literal search, fixed diffs/status/history and structured submission. Canonicalize paths, reject traversal/symlinks/non-regular/oversized files and deny common secret/metadata paths. Disable Git external diff/text conversion, hooks/fsmonitor, pagers and optional locks for reviewer operations. Never run project scripts.
 
-Secret-name filtering is **not secret detection**. Secrets embedded in normal source/logs remain a risk. Document this and require the user/executor to keep sensitive material out of the review packet and authorized workspace. Do not describe these tools as an OS sandbox against a malicious concurrent process.
+Text reads cannot expose binary data. Bounded binary artifacts may be fingerprinted for freshness without claiming their contents were reviewed. Snapshot declared and all changed/untracked files, and check additionally inspected dependencies before accepting a report and before first publication. These are freshness checks, not transactional snapshots or an OS sandbox.
 
-For Git operations use fixed argument arrays, literal pathspecs and no shell. Disable external diff/text conversion, filesystem-monitor hooks, optional locks and pagers. Do not run project scripts or tests. Test hostile Git configuration without executing it.
+Reference bounds: 12 turns and 30 inspection attempts per round, 600,000 context characters, 8MiB worker output, 1MiB per regular file, 300 changed/untracked files, 8MiB snapshot, 3,000 discovery entries/depth checks, 200 search files/about 8MiB/100 matches, and 1,000 inspected hashes. Label truncation. Per-round bounds do not cap total implementation or repeated-review cost.
 
-Reference safety bounds per round:
+## Reports and state
 
-- 12 model responses, 30 inspections
-- 180,000 characters accumulated model context
-- 12,000 output tokens per request, high reasoning
-- 1MiB maximum regular text file
-- 3,000 discovery entries / 15 directory levels
-- Search: 200 files / approximately 8MiB, up to 100 matches
-- Snapshot: 300 changed/untracked files / 8MiB
-- 1,000 recorded inspected-file hashes
+Reports contain summary, findings and essential evidenceGaps. Each finding has a stable A1/A2 ID, severity blocking/non_blocking, disposition fix_now/separate_task, status open/resolved/disputed/deferred, and title/evidence/resolution. Carry every prior ID, including resolved ones. Reject duplicate IDs, dropped findings and blocker downgrades. Require an actual successful file/diff inspection before submission.
 
-These bound resource use but are not a total cost guarantee. Validate tool arguments at the private tool boundary; do not trust model output. Label truncated evidence and failures accurately. Do not let insufficient inspection become a clean report.
+Derive local outcomes in code: reviewing, needs_fixes, passed, incomplete. Passed means no unresolved blockers or essential gaps in inspected evidence—not certification. Identical file/test evidence, disputes, deferred blockers, malformed output, cancelled/failed workers and unstable snapshots cannot pass.
 
-## Structured findings and state
+Persist local cycle ID/version/round/root/baseline/packet/report/fingerprints/inspected hashes/tmux descriptor. Persist GitHub target/head/base/branch/PR/author/request ID/time/phase/feedback separately. Old in-process approvals must not authorize the new pipeline without a user reset.
 
-Astra finishes by calling private `review_submit` alone, with:
+## GitHub association and retries
 
-```json
-{
-  "summary": "Concise evidence-based assessment",
-  "findings": [{
-    "id": "A1",
-    "severity": "blocking",
-    "disposition": "fix_now",
-    "status": "open",
-    "title": "Failure path loses the current session",
-    "evidence": "Specific file/line or inspected contract evidence",
-    "resolution": "Required correction and a focused verification check"
-  }],
-  "evidenceGaps": []
-}
-```
+Require a clean feature branch in the explicit repository root; origin fetch/push URLs must match the requested github.com repository. Reject default/base/main/master branches. Initial remote base must equal the local reviewer’s frozen baseline. GitHub corrections must descend from the prior requested head and must not overwrite independently changed heads/bases.
 
-Finding enums:
+Record publication intent before remote writes. Timeouts can happen after success: reconcile the matching PR and an exact cycle/head request marker rather than posting duplicates. Keep publishing state until the request is recorded. Do not replace its head while recovery is pending.
 
-- severity: blocking, non_blocking
-- disposition: fix_now, separate_task
-- status: open, resolved, disputed, deferred
+Only accept the trusted Codex bot identity and fresh feedback associated with the current request/commit. Inline findings must belong to the matching review and original commit; findings take precedence over clean signals. Recognize an explicit matching reviewed-commit clean message or the bot’s thumbs-up on the exact request comment. Unknown formats remain pending. Recheck PR/head/base while collecting evidence. Pagination limits and API/auth/usage failures pause, never imply approval.
 
-Keep stable A1, A2, … IDs. Re-reviews carry every prior finding, including resolved ones, with updated evidence/status. Reject duplicate IDs, omitted prior findings, invalid schemas and silent blocker downgrades. Label speculation as uncertainty rather than a confirmed bug.
+Activation is not authorization to publish unrelated/private code. The main agent must obtain the user’s publication permission and follow repository instructions. No automatic merge operation is part of this feature.
 
-Derive the outcome in extension code, not from an unvalidated model “pass” string:
+## Delivery and validation
 
-- `passed`: no unresolved blockers and no essential evidence gaps
-- `needs_fixes`: blockers/gaps remain with rounds available
-- `incomplete`: limits, disagreement, necessary deferral, evidence instability, cancellation or errors
+Ship the manifest, command extension, contract/workspace/reviewer/process/tmux/GitHub modules, worker, private child extension, tests and documentation. Register only the main extension for automatic discovery. Preserve existing installations deliberately; do not load duplicate copies.
 
-Persist cycle ID, version, round, status/reason, root, frozen baseline, packet/resolutions, file/evidence fingerprints, report and inspected-file hashes. Reserve the round before inference so an interrupted review cannot disappear from accounting.
+Test real temporary files/Git repositories, real owned tmux transport with simulated inference, stable session reuse past three rounds, cancellation, no progress, disputes, stale/mismatched artifacts, legacy state, forbidden inspection, binary freshness, publication retries, stale/missing/ambiguous GitHub feedback and trusted latest-head clearance. Simulated tests must not make inference or remote write requests.
 
-Fingerprint evidence before and after review. Check files Astra inspected beyond the declared list too. A concurrent change means incomplete. Invalidate stale passes at coordinator handoff, new user runs and status checks. These are freshness checks, not a transactional repository snapshot.
+Run through the actual Pi loader and require an explicit test report. Smoke-test package loading and typecheck against the installed SDK. Separately record any authorized live Astra/GitHub tests, actual provider handoffs, and GUI behavior; fixture success does not establish them.
 
-Tests in the packet are executor-reported. Astra did not run them. “Passed” means no blocking findings in inspected evidence, not certification or a replacement for testing and external review.
-
-## Deliverables and testing
-
-Prefer global auto-discovery under the receiving Pi configuration directory:
-
-```text
-~/.pi/agent/extensions/astra-advisor/index.ts
-~/.pi/agent/extensions/astra-advisor/contracts.ts
-~/.pi/agent/extensions/astra-advisor/workspace.ts
-~/.pi/agent/extensions/astra-advisor/reviewer.ts
-~/.pi/agent/extensions/astra-advisor/README.md
-~/.pi/agent/extensions/astra-advisor/test.mjs
-~/.pi/agent/extensions/astra-advisor/tests/run.ts
-```
-
-Equivalent internal structure is acceptable. Keep production types explicit and parse data at boundaries. Avoid unnecessary dependencies and code comments unless the target project's rules/tooling require them.
-
-Test command activation, GUI marker handling, controls, task forwarding, acknowledgments, branch restoration, all model/effort routes, clean review, fix/recheck success, the three-round ceiling, unchanged evidence, disagreements, missing evidence, non-blocking follow-ups, reset behavior, stale passes, interruption/cancellation, provider errors, malformed reports, private tool limits, forbidden tool calls, symlinks/traversal, oversized/binary files and hostile Git diff configuration.
-
-Use fake model responses with real temporary files/Git repositories. Run tests through the actual Pi loader where practical, avoiding fragile source-text rewriting mocks. The reference test command is:
-
-```sh
-pi -e ~/.pi/agent/extensions/astra-advisor/tests/run.ts --no-session --mode json -p '/astra-advisor-test'
-```
-
-Verify flags against the installed version. Require an explicit passed-test report; a zero exit code alone may not prove an extension command succeeded. Run a real no-inference activation smoke test and typecheck against the installed SDK version when possible.
-
-Do not launch paid live review calls merely to test loading. Report separately whether real Astra inspection, actual provider handoffs and GUI display were tested. The reference implementation has local regression coverage and activation checks; that does not establish live review quality.
-
-## Completion response
-
-Report installed file paths, test results, unverified behavior and reload instructions. Include these examples:
-
-```text
-/reload
-/astra-advisor
-/astra-advisor Investigate and fix the failing tests.
-Use /astra-advisor to investigate and fix the failing tests.
-/astra-advisor status
-/astra-advisor reset-review
-```
-
-Keep it concise. Installing the extension or activating it in a separate smoke-test process does not activate it in an already-running user session.
+Update README, reference, security/limits, development guide, release checklist and companion HTML/PDF. Apply Unslop’s available rules without inventing verification claims. Report installed paths, test results, remaining gaps, PR/main status and reload instructions concisely. Installation or a separate activation smoke test does not activate an already-running session.

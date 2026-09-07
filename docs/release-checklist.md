@@ -1,42 +1,38 @@
 # Release checklist
 
-Repository: [AmbitiousRealism2025/astra-advisor](https://github.com/AmbitiousRealism2025/astra-advisor). The initial source publication is experimental and MIT-licensed. No tagged release or broader compatibility guarantee is implied; the remaining validation below is still open.
+Repository: [AmbitiousRealism2025/astra-advisor](https://github.com/AmbitiousRealism2025/astra-advisor). Version 0.2.0 replaces in-process verification with tmux Astra Medium and GitHub Codex review. Distribution remains experimental and MIT-licensed; no tagged release or broader compatibility guarantee is implied.
 
-## Decisions for the maintainer
+## Distribution
 
-- [x] Confirm `AmbitiousRealism2025/astra-advisor` as the public repository.
-- [x] Select MIT, add `LICENSE` with AmbitiousRealism2025 as copyright holder, and update package metadata and README.
-- [ ] Confirm the draft `0.1.0` version and whether the first release should be labeled experimental.
-- [x] Enable GitHub private vulnerability reporting and add `SECURITY.md` with the reporting link.
+- [x] Public repository, MIT license and private vulnerability reporting are configured.
+- [x] Git installation URL and package metadata are documented.
+- [x] Only `index.ts` auto-loads; worker/private tools are explicit helper files in the package manifest.
+- [x] Repeat package install/remove and dry-run contents checks for this replacement.
+- [ ] Validate pinned Git installation and update behavior before claiming reproducible-release support.
 
-`private: true` prevents accidental npm publication; it does not prevent a public GitHub repository or Pi installation from Git. Keep it if distribution is Git-only. The package license is MIT.
+`private: true` prevents npm publication, not GitHub publication or Pi Git installation. Do not advertise an uncreated tag.
 
-## Documentation and installation
+## Behavior
 
-- [x] Add the exact GitHub installation URL and repository metadata. Do not advertise a nonexistent release tag.
-- [x] Test local-path installation and removal in a clean Pi configuration, not just extension loading from a development directory.
-- [ ] Test installing a pinned tag/commit, updating, disabling, and removing the package.
-- [x] Confirm only `index.ts` is registered; tests and helper modules must not be auto-loaded as extensions.
-- [x] Check relative README/docs links; the included three-page PDF was visually checked when generated.
-- [ ] Keep source behavior, README, reference, PDF and portable build specification aligned.
+- [x] Replacement regression suite passed 18 cases with real owned tmux transport and simulated inference/GitHub responses.
+- [x] Replacement source passed an ad hoc strict typecheck against Pi 0.85.1 declarations; this is not repository CI.
+- [x] Package-loading smoke check returned inactive/no review without inference.
+- [x] Record live Astra startup, inspection, same-session resumption and structured findings. Final clearance is a separate result.
+- [ ] Record real GitHub request, findings/corrections and explicit latest-head clearance.
+- [ ] Validate actual main-session provider handoffs and GUI rendering/interruption behavior in each supported host.
+- [ ] Validate macOS/other Pi versions before extending the Linux/Pi 0.85.1 support claim. Windows remains unsupported.
 
-## Behavior and support claims
+Missing or ambiguous review feedback is pending. Cancellation, errors, disagreement or no progress never authorize publication or merge. This feature never merges automatically.
 
-- [x] Run the copied regression suite in an isolated Pi configuration and check the explicit `20 tests passed` report.
-- [ ] Validate a complete live review: inspect -> blocker -> fix -> recheck -> coordinator.
-- [ ] Confirm actual provider model/effort selection, cancellation and usage reporting.
-- [ ] Verify GUI activation and custom messages in each host you intend to support.
-- [ ] Fix/test plain-prompt GUI control parity before advertising it: the fallback status acknowledgment currently precedes the freshness check, and plain-prompt handling is a pre-agent hook rather than an immediate command handler.
-- [ ] Keep Linux/Pi 0.85.1 as the tested environment until other combinations have been checked. Do not claim Windows support.
-- [ ] Add a reproducible typecheck/CI setup if you want a CI compatibility claim; the existing strict typecheck was a local ad hoc check.
+## Documentation and public content
 
-## Public-content review
+- [x] Update README, reference, security/limits, development guide, portable specification and companion HTML for both review loops.
+- [x] Regenerate and visually inspect all three PDF pages.
+- [x] Synchronize the requested external Markdown/HTML/PDF copies.
+- [x] Apply available Unslop core/Crisp Human rules manually; scanner scripts were unavailable.
+- [x] Check relative links and package contents.
+- [ ] Recheck the final staged files.
+- [x] Gitleaks found no leaks in source/docs; repeat the scan on the final candidate and extracted PDF text. Scanner success is not proof that all sensitive content is absent.
+- [x] Synchronize the installed extension with a backup outside auto-discovery directories; reload is required.
 
-- [x] Inspect the initial staged file list before pushing.
-- [x] Exclude authentication files, settings, sessions, raw logs, backups and local dependency trees.
-- [x] Run basic private-path and credential-pattern checks on source, fixtures, Markdown, HTML and extracted PDF text; no matches found. This does not establish absence of all secrets or proprietary content.
-- [x] Run Gitleaks 8.30.1 before initial publication; no leaks found. A scanner result is not a security audit or proof that every secret is absent.
-- [x] Copy only extension sources and selected documentation, not the entire `~/.pi/agent` directory.
-- [x] Review the security documentation without treating its restrictions as proof of an OS sandbox.
-
-Before future releases, recheck the staged changes and rerun the relevant validation. Do not turn the initial local checks into claims of live provider or GUI support.
+Do not publish authentication, settings, session artifacts, raw logs, local dependencies or backups. Preserve the distinction between fixture coverage, live checks and unverified behavior. Review and test the final diff before publication.

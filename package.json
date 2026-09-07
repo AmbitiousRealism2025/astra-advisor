@@ -1,7 +1,7 @@
 {
   "name": "astra-advisor",
-  "version": "0.1.0",
-  "description": "A Pi extension for Sol/Luna execution with Astra planning advice and bounded read-only review.",
+  "version": "0.2.0",
+  "description": "Sol/Luna execution, persistent tmux Astra Medium review, and commit-bound GitHub Codex review loops for Pi.",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -35,6 +35,11 @@
     "contracts.ts",
     "workspace.ts",
     "reviewer.ts",
+    "process.ts",
+    "tmux.ts",
+    "tmux-worker.mjs",
+    "tmux-review-tools.ts",
+    "github.ts",
     "test.mjs",
     "tests/run.ts",
     "README.md",

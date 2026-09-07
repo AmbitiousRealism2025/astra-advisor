@@ -1,105 +1,60 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Astra Advisor — Advice, implementation and review</title>
+<html lang="en"><head><meta charset="utf-8"><title>Astra Advisor — tmux and GitHub review</title>
 <style>
-@page { size: A4; margin: 18mm 19mm; }
-* { box-sizing: border-box; }
-body { margin: 0; color: #21313d; background: white; font: 11.5pt/1.45 Arial, sans-serif; }
-h1 { font-size: 32pt; line-height: 1.1; letter-spacing: -1px; margin: 12px 0 14px; color: #102a38; }
-h2 { font-size: 16pt; line-height: 1.25; margin: 20px 0 9px; color: #102a38; }
-p { margin: 0 0 12px; }
-.eyebrow { text-transform: uppercase; letter-spacing: 2px; color: #397075; font-size: 9pt; font-weight: bold; }
-.lead { font-size: 14pt; line-height: 1.45; margin-bottom: 20px; }
-.note { background: #eef4f4; border-left: 3px solid #397075; padding: 13px 16px; margin: 17px 0; }
-table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 10.5pt; }
-th { text-align: left; background: #edf3f5; color: #102a38; }
-th, td { padding: 9px; border-bottom: 1px solid #dce4e8; vertical-align: top; }
-code { font: 10pt/1.5 monospace; }
-pre { background: #f2f5f7; border: 1px solid #dce4e8; padding: 11px 13px; white-space: pre-wrap; margin: 8px 0 12px; font: 10pt/1.5 monospace; }
-ul, ol { padding-left: 22px; margin: 8px 0 13px; }
-li { margin-bottom: 8px; }
-.small { font-size: 9.5pt; color: #546570; }
-.page { break-after: page; }
-.page:last-child { break-after: auto; }
-.footer { border-top: 1px solid #dce4e8; margin-top: 18px; padding-top: 10px; font-size: 9pt; color: #546570; }
-</style>
-</head>
-<body>
-<section class="page">
-<div class="eyebrow">Pi extension · User guide</div>
-<h1>Astra Advisor</h1>
-<p class="lead">Use Sol to manage your task, ask Astra for advice, and have Astra inspect the finished work.</p>
-<p>Astra Advisor is an add-on for the Pi coding agent. You turn it on when you want this model-switching approach. You keep working in the same conversation.</p>
-<h2>Who does what?</h2>
-<table>
-<thead><tr><th>Model and setting</th><th>Its job</th></tr></thead>
-<tbody>
-<tr><td><strong>Sol Medium</strong></td><td>Starts the task, gathers context, and reports the result or asks you to resolve an outstanding decision.</td></tr>
-<tr><td><strong>Astra High</strong></td><td>Gives planning advice. After implementation, it can inspect code and diffs with read-only tools and identify problems.</td></tr>
-<tr><td><strong>Luna High</strong></td><td>Handles narrow, clearly defined implementation work and corrections.</td></tr>
-<tr><td><strong>Sol High</strong></td><td>Handles complex, uncertain, or higher-risk implementation work and corrections.</td></tr>
-</tbody>
-</table>
-<p class="small">“Medium” and “High” are reasoning-effort settings. They are not guarantees of correctness.</p>
-<h2>Advice first, evidence review afterward</h2>
-<p>Planning advice uses a focused brief. Astra has no tools at this stage. The executor then makes the change, runs checks and inspects the diff.</p>
-<p>For the final review, Astra gets read-only access to the current workspace. It can read files, search code, inspect changes and look at recent Git history. It checks the implementation against the goal, intended behavior and reported test results.</p>
-<div class="note"><strong>Astra reviews; Sol or Luna fixes.</strong> The reviewer cannot edit files, run shell commands or tests, deploy anything, or grant approval.</div>
-<p class="small">The policy requires review for protocol, data-storage, authentication, package, session-lifecycle and release work. Routine low-risk review is optional. Model judgment still determines when to call the review tool.</p>
-<div class="footer">Astra Advisor / What it does <span style="float:right">1 / 3</span></div>
-</section>
-<section class="page">
-<div class="eyebrow">The review loop</div>
-<h2 style="margin-top:12px">Fix important problems, then stop</h2>
-<p>Astra classifies each finding and explains the evidence. The extension uses that report to choose the next step.</p>
-<table>
-<thead><tr><th>Review result</th><th>What happens next</th></tr></thead>
-<tbody>
-<tr><td><strong>No blocking issues</strong></td><td>Return to Sol Medium for the final report. Minor follow-up suggestions can remain.</td></tr>
-<tr><td><strong>Fixes or evidence needed</strong></td><td>Return to Sol or Luna High. It checks the findings, makes confirmed fixes, runs affected checks and requests another review.</td></tr>
-<tr><td><strong>Incomplete or disputed</strong></td><td>Return to Sol Medium with the unresolved findings and reasons. Ask you for a decision when necessary.</td></tr>
-</tbody>
-</table>
-<h2>What gets fixed now?</h2>
-<p>Problems that prevent the requested change from working safely are blockers. Examples include broken behavior, security mistakes, data loss or incompatible interfaces.</p>
-<p>An unrelated existing problem or optional improvement can become a separate-task proposal. A large necessary fix is still blocking: the agent must ask before expanding the scope. It cannot turn a failed review into a pass by deferring that fix.</p>
-<h2>How the loop stays bounded</h2>
-<ul>
-<li><strong>Three review rounds at most:</strong> the initial review and up to two corrective re-reviews.</li>
-<li><strong>Focused rechecks:</strong> Astra follows the same finding IDs and examines the corrections rather than starting from scratch.</li>
-<li><strong>No identical-evidence repeats:</strong> unchanged files and test evidence stop another review request.</li>
-<li><strong>No forced approval:</strong> limits, disagreements, cancellation and unresolved evidence return an incomplete result. They never count as a pass.</li>
-</ul>
-<div class="note">Returning to Sol Medium means you get control and a report. It does <strong>not</strong> mean the work passed verification.</div>
-<p class="small">The main agent drives fixes and rechecks; code enforces review-state transitions and limits. A pass means no blocking findings in inspected evidence, not proof that all bugs are gone. Astra does not independently run the reported tests.</p>
-<div class="footer">Astra Advisor / Fixes and review outcomes <span style="float:right">2 / 3</span></div>
-</section>
-<section class="page">
-<div class="eyebrow">Getting started</div>
-<h2 style="margin-top:12px">Turn it on when you need it</h2>
-<p>After installation or an update, reload or restart Pi. In the Pi terminal interface:</p>
+@page { size:A4; margin:18mm 19mm; }
+* { box-sizing:border-box; } body { margin:0; color:#21313d; background:white; font:11pt/1.4 Arial,sans-serif; }
+h1 { font-size:32pt; line-height:1.1; margin:12px 0 18px; } h2 { font-size:17pt; margin:22px 0 10px; }
+p { margin:0 0 13px; } table { border-collapse:collapse; width:100%; margin:16px 0; font-size:10.5pt; }
+th,td { padding:10px; border-bottom:1px solid #dce4e8; text-align:left; vertical-align:top; } th { background:#edf3f5; }
+.note { background:#eef4f4; border-left:3px solid #397075; padding:14px; margin:18px 0; }
+.eyebrow { text-transform:uppercase; letter-spacing:2px; font-size:9pt; color:#397075; }
+pre { white-space:pre-wrap; background:#f2f5f7; padding:12px; font:10pt/1.5 monospace; } code { font-size:10pt; }
+li { margin-bottom:8px; } .small,.footer { font-size:9.5pt; color:#546570; }
+.footer { border-top:1px solid #dce4e8; margin-top:20px; padding-top:10px; }
+.page { break-after:page; } .page:last-child { break-after:auto; }
+</style></head><body>
+<section class="page"><div class="eyebrow">Pi extension · User guide</div><h1>Astra Advisor</h1>
+<p>Keep implementation in your Pi/PiBB conversation. Have Astra inspect the result in a persistent tmux session, then have Sol handle GitHub Codex review through to an explicit clean result.</p>
+<h2>Who does what?</h2><table><tr><th>Model</th><th>Responsibility</th></tr>
+<tr><td>Sol Medium</td><td>Coordinates, waits for review, and reports results or decisions needed.</td></tr>
+<tr><td>Astra High</td><td>Gives planning advice from a focused brief, without tools.</td></tr>
+<tr><td>Luna High</td><td>Handles narrow initial implementation.</td></tr>
+<tr><td>Sol High</td><td>Handles complex implementation and all corrections requested by either reviewer.</td></tr>
+<tr><td>Astra Medium in tmux</td><td>Reads code and diffs. Retains its own Pi conversation across corrective rounds.</td></tr>
+</table><p class="small">Medium and High are reasoning-effort settings, not guarantees of correctness. The model mapping uses openai-codex.</p>
+<h2>Review locally before publishing</h2><p>Sol gathers evidence, implements, runs checks and inspects the diff. It then sends Astra an explicit review packet with scope, restrictions and test results.</p>
+<p>Astra can read permitted files, search code and inspect fixed Git queries. Sol validates its findings, fixes confirmed blockers, tests again and returns the corrections to the same reviewer conversation.</p>
+<div class="note"><strong>Astra reviews; Sol fixes.</strong> The reviewer cannot edit files, run shell commands or tests, publish code, or grant approval.</div>
+<p>The local loop has no fixed three-round ceiling. Identical evidence, disagreements, necessary deferrals, cancellation and operational failures stop without approval. Per-round resource limits still apply.</p>
+<div class="footer">Astra Advisor / Local review · 1 / 3</div></section>
+<section class="page"><div class="eyebrow">GitHub review</div><h2>Request review of the exact commit</h2>
+<ol><li><strong>Obtain publication permission.</strong> Activation is not permission to publish private code or unrelated work.</li>
+<li><strong>Commit the intended change on a feature branch.</strong> The publication tool checks that the committed evidence still matches the clean local review and the current PR base.</li>
+<li><strong>Push and open the PR.</strong> The tool uses the explicit repository matching origin, pushes without force, creates or updates the PR, and posts <code>@codex review</code> for the exact head.</li>
+<li><strong>Wait for Codex.</strong> Findings return to Sol High. Sol fixes, tests, commits and requests review of the new head. Corrections stay in the main Pi/PiBB session.</li>
+<li><strong>Report the reviewed PR.</strong> Finish only when trusted Codex feedback explicitly clears the latest requested commit. The extension never merges.</li></ol>
+<h2>Pending is not clean</h2><p>A matching clean message from the Codex bot, or its thumbs-up on the exact request, can establish clearance. Current-commit findings take precedence. The local and remote head/base must still match.</p>
+<p>Silence, an eyes reaction, a generic completed summary, stale feedback and a polling timeout remain pending. Authentication, API, usage and changed-target problems pause the loop for attention.</p>
+<div class="note"><strong>No forced approval.</strong> Neither a stopped retry loop nor a return to Sol Medium means the work passed. A clean result is evidence from a model review, not certification or permission to merge.</div>
+<h2>Necessary fixes stay necessary</h2><p>A correctness, security or compatibility problem cannot be cleared simply by calling it a separate task. Optional independent work may be proposed, but scope expansion and disagreements need your decision.</p>
+<p class="small">GitHub must have the Codex integration configured. Remote writes can succeed before a timeout; retry the recorded publication to reconcile it rather than creating duplicate requests.</p>
+<div class="footer">Astra Advisor / GitHub corrections · 2 / 3</div></section>
+<section class="page"><div class="eyebrow">Getting started</div><h2>Install and activate</h2>
+<pre>pi install git:github.com/AmbitiousRealism2025/astra-advisor</pre>
+<p>Reload or restart the Pi backend after installation. Do not load a manual copy and the package together.</p>
 <pre>/reload
-/astra-advisor</pre>
-<p>You do not need to add <code>on</code>. To activate and start a task:</p>
-<pre>/astra-advisor Investigate and fix the failing tests.</pre>
-<p>In a GUI that sends prompts to Pi, start your prompt with:</p>
-<pre>Use /astra-advisor to investigate and fix the failing tests.</pre>
-<p>The extension emits <strong>“Astra Advisor active”</strong>, plus review-start and outcome messages. A GUI must support Pi custom messages to display them.</p>
-<h2>Check, stop or start a fresh review cycle</h2>
-<pre>/astra-advisor status
+/astra-advisor
+/astra-advisor Investigate and fix the failing tests.</pre>
+<p>In a GUI that passes ordinary prompts to Pi:</p><pre>Use /astra-advisor to investigate and fix the failing tests.</pre>
+<p>Look for “Astra Advisor active.” The GUI must render Pi custom messages to show the acknowledgment and review updates.</p>
+<h2>Check, stop or reset</h2><pre>/astra-advisor status
 /astra-advisor off
 /astra-advisor reset-review</pre>
-<p>It stays enabled for the session until turned off. Use <code>reset-review</code> when you authorize a new cycle for another task, or a retry after an incomplete review. Previous reports stay in history. Resetting does not mean verification passed.</p>
-<h2>What to keep in mind</h2>
-<ul>
-<li><strong>Keep secrets out.</strong> Astra sees the supplied brief and files it reads. Common secret paths are blocked, but credentials hidden in ordinary source or logs may still be exposed.</li>
-<li><strong>Expect some extra time and usage.</strong> Reviews make model requests. You can cancel them normally; there is no background worker team.</li>
-<li><strong>Keep testing and reviewing.</strong> Read-only inspection cannot replace tests, your approval or external code review. Changed evidence can invalidate an earlier pass.</li>
-</ul>
-<p class="small">Uses existing Pi authentication and the <code>openai-codex</code> model mapping. Turning it off does not change global defaults. The reviewer is restricted to the current workspace, not arbitrary files elsewhere on your machine.</p>
-<div class="footer"><strong>To recreate it:</strong> give a Pi agent <code>astra-advisor-pi-extension.md</code>.<br>Local regression tests and activation checks passed. Live Astra review, real provider handoffs and GUI rendering still need separate validation. <span style="float:right">3 / 3</span></div>
-</section>
-</body>
-</html>
+<p>Status shows saved pipeline state, not a fresh GitHub poll. Off cancels pending work but cannot undo completed remote writes. Reset authorizes a new cycle and closes only the owned tmux session; previous reports, artifacts and PRs remain.</p>
+<h2>Requirements and limits</h2><ul>
+<li>Pi 0.85.1 is the tested version on Linux. Git, tmux, Node, Pi CLI, configured model access and authenticated GitHub CLI are required. Windows is unsupported.</li>
+<li>Keep secrets out of briefs and readable source. Filename exclusions are not secret detection. Reviewer tools are restricted, but the extension is not an OS sandbox.</li>
+<li>The reviewer’s conversation and logs persist under Pi’s agent directory. Do not publish raw session files or unsanitized logs.</li>
+<li>Repeated reviews add time and usage. Tests and live-provider checks are different evidence; consult the development guide for current validation.</li></ul>
+<div class="footer">Portable implementation brief: docs/build-specification.md<br>Astra Advisor / Use and limitations · 3 / 3</div>
+</section></body></html>
